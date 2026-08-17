@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ConductiPro - Evaluador de Conductividad</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        forest: {
+                            50: '#f0f7f4',
+                            100: '#dbede4',
+                            200: '#b9dcce',
+                            300: '#8dc2b0',
+                            400: '#5fa38f',
+                            500: '#408774',
+                            600: '#2f6c5d',
+                            700: '#27574c',
+                            800: '#22463e',
+                            900: '#1f3b35',
+                            950: '#0e221f',
+                        },
+                        earth: {
+                            50: '#fdf8f5',
+                            100: '#f7eee7',
+                            200: '#eedacf',
+                            300: '#e0beab',
+                            400: '#ce9c82',
+                            500: '#be7e62',
+                            600: '#a7644a',
+                            700: '#8b4f3b',
+                            800: '#734335',
+                            900: '#5f3a2f',
+                            950: '#331c17',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7eee7;
+        }
+        /* Custom scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #eedacf;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #a7644a;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #8b4f3b;
+        }
+        button, input, select, textarea {
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+    </style>
+</head>
+<body class="text-earth-950 min-h-screen flex flex-col justify-between selection:bg-forest-500 selection:text-white bg-earth-100/60">
+
+    <!-- Toast Notification Overlay -->
+    <div id="toastNotification" class="fixed top-4 right-4 z-50 transform translate-y-[-150%] opacity-0 transition-all duration-300 max-w-sm w-full bg-forest-900 text-white p-4 rounded-xl shadow-xl flex items-center justify-between border border-forest-600 pointer-events-none">
+        <div class="flex items-center space-x-3">
+            <i id="toastIcon" class="fa-solid fa-circle-check text-forest-300 text-lg"></i>
+            <span id="toastMessage" class="text-xs sm:text-sm font-medium">Notificación</span>
+        </div>
+        <button onclick="hideToast()" class="text-earth-300 hover:text-white text-xs p-1">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-200">
+        <div class="bg-white rounded-2xl p-5 sm:p-6 max-w-md w-full shadow-2xl border border-earth-200 transform scale-95 transition-transform duration-200" id="confirmModalCard">
+            <div class="flex items-center gap-3 text-earth-800 mb-3">
+                <div class="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0">
+                    <i class="fa-solid fa-triangle-exclamation text-lg"></i>
+                </div>
+                <h3 class="text-base font-bold text-earth-900">¿Limpiar todos los datos?</h3>
+            </div>
+            <p class="text-xs sm:text-sm text-earth-700 mb-5">Esta acción borrará todas las lecturas de conductividad ingresadas y reiniciará el análisis. Esta acción no se puede deshacer.</p>
+            <div class="flex justify-end gap-2.5">
+                <button onclick="closeConfirmModal()" class="px-4 py-2 bg-earth-100 hover:bg-earth-200 text-earth-800 text-xs sm:text-sm font-semibold rounded-xl transition">
+                    Cancelar
+                </button>
+                <button onclick="executeClearData()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm font-semibold rounded-xl transition shadow">
+                    Sí, Limpiar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <header class="bg-gradient-to-r from-forest-900 via-forest-800 to-earth-900 text-white shadow-md border-b-4 border-earth-600 sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div class="flex items-center space-x-3 w-full sm:w-auto">
+                    <div class="w-10 h-10 sm:w-11 sm:h-11 bg-earth-500 rounded-xl flex items-center justify-center text-white shadow-inner flex-shrink-0">
+                        <i class="fa-solid font-bold fa-bolt-lightning text-lg sm:text-xl text-forest-100"></i>
+                    </div>
+                    <div class="flex-grow">
+                        <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-forest-50 leading-tight">ConductiLab Pro</h1>
+                        <p class="text-[11px] sm:text-xs text-earth-200">Evaluación de Repetibilidad (≤ 3.0%)</p>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-2 border-t border-forest-700/60 pt-2 sm:pt-0 sm:border-0">
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-semibold bg-forest-700/80 text-forest-100 border border-forest-500">
+                        <i class="fa-solid fa-flask-vial mr-1.5 text-earth-300"></i> USP / ISO
+                    </span>
+                    <button onclick="loadDemoData()" class="px-3 py-1.5 bg-earth-700 hover:bg-earth-600 text-earth-100 text-xs font-medium rounded-lg transition duration-200 shadow flex items-center gap-1.5 active:scale-95">
+                        <i class="fa-solid fa-vial"></i> Ejemplo
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 w-full flex-grow">
+        
+        <div id="statusBanner" class="mb-4 sm:mb-6 bg-white rounded-2xl shadow-sm border border-earth-200 p-4 sm:p-5 transition-all duration-300">
+            <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4">
+                <div class="flex items-start sm:items-center space-x-3 sm:space-x-4 w-full">
+                    <div id="statusIconBg" class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-earth-100 text-earth-600 flex items-center justify-center text-lg sm:text-xl flex-shrink-0 mt-0.5 sm:mt-0">
+                        <i id="statusIcon" class="fa-solid fa-hourglass-start"></i>
+                    </div>
+                    <div class="flex-grow">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <h2 id="statusTitle" class="text-base sm:text-lg font-bold text-earth-900 leading-snug">Esperando datos de medición</h2>
+                            <span id="badgeCount" class="text-[11px] sm:text-xs font-semibold px-2.5 py-0.5 rounded-full bg-earth-200 text-earth-800">
+                                0 / 3 Registrados
+                            </span>
+                        </div>
+                        <p id="statusDesc" class="text-xs sm:text-sm text-earth-700 mt-0.5">Se requieren ingresar al menos 3 lecturas de conductividad para evaluar la repetibilidad.</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3 w-full md:w-auto justify-stretch sm:justify-end pt-1 md:pt-0">
+                    <button id="btnClear" onclick="openConfirmModal()" class="w-full md:w-auto min-h-[42px] justify-center px-4 py-2.5 bg-earth-100 hover:bg-earth-200 active:bg-earth-300 text-earth-800 font-medium rounded-xl text-xs sm:text-sm transition duration-200 flex items-center gap-2 border border-earth-300 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        <i class="fa-solid fa-trash-can text-earth-600"></i> Limpiar Datos
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-8">
+            
+            <div class="lg:col-span-5 space-y-4 sm:space-y-6">
+                
+                <div class="bg-white rounded-2xl shadow-sm border border-earth-200 p-4 sm:p-6 space-y-4 sm:space-y-5">
+                    <div class="flex justify-between items-center border-b border-earth-100 pb-3">
+                        <h3 class="text-sm sm:text-base font-semibold text-forest-900 flex items-center gap-2">
+                            <i class="fa-solid fa-pen-to-square text-earth-600"></i> Registro de Conductividad
+                        </h3>
+                        <span class="text-[11px] text-earth-600 bg-earth-50 px-2 py-1 rounded border border-earth-200">
+                            Tol: <strong>≤ 3.0%</strong>
+                        </span>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-earth-800 mb-1">Unidad de Medida</label>
+                        <select id="unitSelect" onchange="updateUnits()" class="w-full bg-earth-50 border border-earth-300 text-earth-900 text-sm rounded-xl focus:ring-2 focus:ring-forest-500 focus:border-forest-500 p-3 outline-none">
+                            <option value="µS/cm" selected>µS/cm (MicroSiemens/cm)</option>
+                            <option value="mS/cm">mS/cm (MiliSiemens/cm)</option>
+                            <option value="S/m">S/m (Siemens/m)</option>
+                            <option value="MΩ·cm">MΩ·cm (Megohm·cm)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <div class="flex border-b border-earth-200 mb-3 text-xs font-medium">
+                            <button id="tabSingle" onclick="switchInputTab('single')" class="flex-1 py-2.5 text-center text-forest-700 border-b-2 border-forest-600 font-semibold focus:outline-none">
+                                Entrada Individual
+                            </button>
+                            <button id="tabBatch" onclick="switchInputTab('batch')" class="flex-1 py-2.5 text-center text-earth-600 hover:text-earth-900 border-b-2 border-transparent focus:outline-none">
+                                Pegar en Lote
+                            </button>
+                        </div>
+
+                        <div id="singleInputContainer" class="space-y-3">
+                            <form onsubmit="handleSingleSubmit(event)" class="flex flex-col sm:flex-row gap-2">
+                                <div class="relative flex-grow">
+                                    <input type="number" id="conductivityInput" step="any" min="0" placeholder="Ej: 1413.5" class="w-full bg-earth-50 border border-earth-300 text-earth-900 text-base font-semibold rounded-xl focus:ring-2 focus:ring-forest-500 focus:border-forest-500 p-3 pr-14 outline-none transition" required>
+                                    <span class="unitLabel absolute right-3 top-3.5 text-xs text-earth-500 font-medium">µS/cm</span>
+                                </div>
+                                <button type="submit" class="w-full sm:w-auto min-h-[46px] bg-forest-600 hover:bg-forest-700 active:bg-forest-800 text-white font-medium px-5 rounded-xl text-sm transition duration-200 shadow-sm flex items-center justify-center gap-1.5 flex-shrink-0">
+                                    <i class="fa-solid fa-plus"></i> Añadir
+                                </button>
+                            </form>
+                            <p class="text-[11px] sm:text-xs text-earth-500">Ingrese cada valor medido de forma secuencial.</p>
+                        </div>
+
+                        <div id="batchInputContainer" class="hidden space-y-3">
+                            <textarea id="batchInput" rows="3" class="w-full bg-earth-50 border border-earth-300 text-earth-900 text-sm rounded-xl focus:ring-2 focus:ring-forest-500 focus:border-forest-500 p-3 outline-none" placeholder="Ingrese o pegue valores separados por coma, espacio o salto de línea. Ej: 1412.0, 1415.2, 1410.8"></textarea>
+                            <button onclick="handleBatchSubmit()" class="w-full min-h-[46px] bg-forest-600 hover:bg-forest-700 active:bg-forest-800 text-white font-medium py-2.5 rounded-xl text-sm transition duration-200 shadow-sm flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-file-import"></i> Procesar Lote
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-earth-200 p-4 sm:p-6 space-y-3 sm:space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-sm sm:text-base font-semibold text-earth-900 flex items-center gap-2">
+                            <i class="fa-solid fa-list-ol text-forest-600"></i> Datos Registrados
+                        </h3>
+                        <span id="dataCounterText" class="text-xs font-medium text-earth-600">0 registros</span>
+                    </div>
+
+                    <div class="overflow-x-auto max-h-56 sm:max-h-72 overflow-y-auto rounded-xl border border-earth-200">
+                        <table class="w-full text-xs sm:text-sm text-left text-earth-800">
+                            <thead class="text-[10px] sm:text-xs text-earth-700 uppercase bg-earth-100 sticky top-0">
+                                <tr>
+                                    <th scope="col" class="px-2.5 sm:px-4 py-2.5 text-center">#</th>
+                                    <th scope="col" class="px-2.5 sm:px-4 py-2.5">Conductividad</th>
+                                    <th scope="col" class="px-2.5 sm:px-4 py-2.5 text-right">Dev. Prom.</th>
+                                    <th scope="col" class="px-2.5 sm:px-4 py-2.5 text-center">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="readingsTableBody">
+                                <tr id="emptyTableMsg">
+                                    <td colspan="4" class="px-4 py-8 text-center text-earth-500 italic">
+                                        No hay mediciones registradas.<br>
+                                        <span class="text-xs font-normal">Agregue al menos 3 valores para iniciar la evaluación.</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div id="minWarning" class="p-3 bg-earth-100 text-earth-800 rounded-xl text-xs flex items-center gap-2 border border-earth-300">
+                        <i class="fa-solid fa-circle-info text-earth-600 text-base flex-shrink-0"></i>
+                        <span>Para dar un dictamen válido de repetibilidad se requieren <strong>mínimo 3 lecturas</strong>.</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="lg:col-span-7 space-y-4 sm:space-y-6">
+                
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4">
+                    
+                    <div class="bg-white p-3 sm:p-4 rounded-2xl shadow-sm border border-earth-200 flex flex-col justify-between">
+                        <span class="text-[11px] sm:text-xs font-medium text-earth-600">Promedio (x̄)</span>
+                        <div class="my-1">
+                            <span id="metricMean" class="text-lg sm:text-xl font-bold text-forest-900 break-all">-</span>
+                            <span class="unitLabel text-[10px] sm:text-xs text-earth-500 block">µS/cm</span>
+                        </div>
+                        <span class="text-[9px] sm:text-[10px] text-earth-400">Media aritmética</span>
+                    </div>
+
+                    <div class="bg-white p-3 sm:p-4 rounded-2xl shadow-sm border border-earth-200 flex flex-col justify-between">
+                        <span class="text-[11px] sm:text-xs font-medium text-earth-600">Desv. Estándar (s)</span>
+                        <div class="my-1">
+                            <span id="metricSD" class="text-lg sm:text-xl font-bold text-forest-900 break-all">-</span>
+                            <span class="unitLabel text-[10px] sm:text-xs text-earth-500 block">µS/cm</span>
+                        </div>
+                        <span class="text-[9px] sm:text-[10px] text-earth-400">Muestral (n-1)</span>
+                    </div>
+
+                    <div class="bg-white p-3 sm:p-4 rounded-2xl shadow-sm border border-earth-200 flex flex-col justify-between">
+                        <span class="text-[11px] sm:text-xs font-medium text-earth-600">RSD / CV %</span>
+                        <div class="my-1">
+                            <span id="metricRSD" class="text-lg sm:text-xl font-bold text-forest-900 break-all">-</span>
+                            <span class="text-[10px] sm:text-xs text-earth-500 font-medium block">%</span>
+                        </div>
+                        <span class="text-[9px] sm:text-[10px] text-earth-400">(SD / Promedio) * 100</span>
+                    </div>
+
+                    <div class="bg-white p-3 sm:p-4 rounded-2xl shadow-sm border border-earth-200 flex flex-col justify-between">
+                        <span class="text-[11px] sm:text-xs font-medium text-earth-600">Rango / Desv. Máx</span>
+                        <div class="my-1">
+                            <span id="metricMaxDev" class="text-lg sm:text-xl font-bold text-forest-900 break-all">-</span>
+                            <span class="text-[10px] sm:text-xs text-earth-500 font-medium block">%</span>
+                        </div>
+                        <span class="text-[9px] sm:text-[10px] text-earth-400">(Max - Min)/Prom * 100</span>
+                    </div>
+                </div>
+
+                <div id="evaluationCard" class="bg-white rounded-2xl shadow-sm border border-earth-200 p-4 sm:p-6 transition-all duration-300">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 mb-4 pb-4 border-b border-earth-100">
+                        <div>
+                            <h3 class="text-sm sm:text-base font-semibold text-earth-900">Evaluación de Repetibilidad (RSD ≤ 3.0%)</h3>
+                            <p class="text-[11px] sm:text-xs text-earth-600">Criterio de Aceptación evaluado según Desviación Estándar Relativa (RSD %)</p>
+                        </div>
+                        <div id="evalBadge" class="w-full sm:w-auto text-center justify-center px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-earth-100 text-earth-700 flex items-center gap-2 flex-shrink-0">
+                            <i class="fa-solid fa-clock"></i> Pendiente
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="bg-earth-50/70 p-3 sm:p-4 rounded-xl border border-earth-200">
+                            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 mb-1.5">
+                                <span class="text-xs text-earth-800 font-semibold">Repetibilidad / Coeficiente de Variación (RSD %):</span>
+                                <span id="rsdStatus" class="text-xs font-bold text-earth-500">Incompleto</span>
+                            </div>
+                            <div class="w-full bg-earth-200 rounded-full h-3 overflow-hidden">
+                                <div id="rsdProgressBar" class="bg-forest-500 h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                            <div class="flex justify-between text-[10px] sm:text-[11px] text-earth-500 mt-1.5">
+                                <span>0.0%</span>
+                                <span class="font-medium text-earth-700">Límite Máximo: 3.0%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-earth-200 p-4 sm:p-6">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3 sm:mb-4">
+                        <h3 class="text-sm sm:text-base font-semibold text-earth-900 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-line text-forest-600"></i> Gráfica de Dispersión y Tolerancia
+                        </h3>
+                        <div class="flex flex-wrap items-center gap-3 text-[10px] sm:text-xs text-earth-700">
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-0.5 bg-forest-600 inline-block"></span> Datos</span>
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-0.5 bg-earth-600 border border-dashed inline-block"></span> Prom.</span>
+                            <span class="flex items-center gap-1 text-red-600"><span class="w-2.5 h-0.5 bg-red-400 inline-block"></span> ±3% Tol.</span>
+                        </div>
+                    </div>
+                    <div class="relative h-52 sm:h-64 md:h-72 w-full">
+                        <canvas id="conductivityChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-2.5 sm:gap-3 justify-end pt-1">
+                    <button onclick="copySummaryToClipboard()" class="w-full sm:w-auto min-h-[44px] px-4 py-2.5 bg-earth-200 hover:bg-earth-300 active:bg-earth-400 text-earth-900 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-copy"></i> Copiar Resumen
+                    </button>
+                    <button onclick="exportCSV()" class="w-full sm:w-auto min-h-[44px] px-4 py-2.5 bg-forest-700 hover:bg-forest-800 active:bg-forest-900 text-white rounded-xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2 shadow-sm">
+                        <i class="fa-solid fa-file-csv"></i> Exportar CSV
+                    </button>
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+    <footer class="bg-earth-900 text-earth-300 py-4 sm:py-6 border-t border-earth-800 text-xs mt-4">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-2 sm:gap-3 text-center sm:text-left">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-leaf text-forest-400"></i>
+                <span class="font-medium">ConductiLab Pro &copy; 2026</span>
+            </div>
+            <p class="text-[11px] text-earth-400">Criterio de Tolerancia del 3.0% (GLP/GMP)</p>
+        </div>
+    </footer>
+
+    <script>
+        // App State
+        let readings = [];
+        let currentUnit = "µS/cm";
+        let chartInstance = null;
+        let toastTimeout = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initChart();
+            updateUI();
+        });
+
+        // Toast Notification System
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toastNotification');
+            const toastMsg = document.getElementById('toastMessage');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastMsg.textContent = message;
+            if (isError) {
+                toast.className = toast.className.replace('bg-forest-900 border-forest-600', 'bg-red-900 border-red-600');
+                toastIcon.className = "fa-solid fa-circle-exclamation text-red-300 text-lg";
+            } else {
+                toast.className = toast.className.replace('bg-red-900 border-red-600', 'bg-forest-900 border-forest-600');
+                toastIcon.className = "fa-solid fa-circle-check text-forest-300 text-lg";
+            }
+
+            toast.classList.remove('translate-y-[-150%]', 'opacity-0', 'pointer-events-none');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            if (toastTimeout) clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                hideToast();
+            }, 3500);
+        }
+
+        function hideToast() {
+            const toast = document.getElementById('toastNotification');
+            toast.classList.add('translate-y-[-150%]', 'opacity-0', 'pointer-events-none');
+            toast.classList.remove('translate-y-0', 'opacity-100');
+        }
+
+        // Confirmation Modal Logic
+        function openConfirmModal() {
+            if (readings.length === 0) return;
+            const modal = document.getElementById('confirmModal');
+            const card = document.getElementById('confirmModalCard');
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            modal.classList.add('opacity-100');
+            card.classList.remove('scale-95');
+            card.classList.add('scale-100');
+        }
+
+        function closeConfirmModal() {
+            const modal = document.getElementById('confirmModal');
+            const card = document.getElementById('confirmModalCard');
+            modal.classList.add('opacity-0', 'pointer-events-none');
+            modal.classList.remove('opacity-100');
+            card.classList.add('scale-95');
+            card.classList.remove('scale-100');
+        }
+
+        function executeClearData() {
+            readings = [];
+            closeConfirmModal();
+            updateUI();
+            showToast("Se han limpiado todos los datos correctamente.");
+        }
+
+        function switchInputTab(tab) {
+            const singleCont = document.getElementById('singleInputContainer');
+            const batchCont = document.getElementById('batchInputContainer');
+            const tabSingleBtn = document.getElementById('tabSingle');
+            const tabBatchBtn = document.getElementById('tabBatch');
+
+            if (tab === 'single') {
+                singleCont.classList.remove('hidden');
+                batchCont.classList.add('hidden');
+                tabSingleBtn.className = "flex-1 py-2.5 text-center text-forest-700 border-b-2 border-forest-600 font-semibold focus:outline-none";
+                tabBatchBtn.className = "flex-1 py-2.5 text-center text-earth-600 hover:text-earth-900 border-b-2 border-transparent focus:outline-none";
+            } else {
+                singleCont.classList.add('hidden');
+                batchCont.classList.remove('hidden');
+                tabBatchBtn.className = "flex-1 py-2.5 text-center text-forest-700 border-b-2 border-forest-600 font-semibold focus:outline-none";
+                tabSingleBtn.className = "flex-1 py-2.5 text-center text-earth-600 hover:text-earth-900 border-b-2 border-transparent focus:outline-none";
+            }
+        }
+
+        function updateUnits() {
+            currentUnit = document.getElementById('unitSelect').value;
+            const labels = document.querySelectorAll('.unitLabel');
+            labels.forEach(lbl => lbl.textContent = currentUnit);
+            updateUI();
+        }
+
+        function handleSingleSubmit(e) {
+            e.preventDefault();
+            const input = document.getElementById('conductivityInput');
+            const val = parseFloat(input.value);
+
+            if (!isNaN(val) && val >= 0) {
+                readings.push(val);
+                input.value = '';
+                input.focus();
+                updateUI();
+                showToast(`Lectura de ${val} ${currentUnit} añadida.`);
+            }
+        }
+
+        function handleBatchSubmit() {
+            const text = document.getElementById('batchInput').value;
+            if (!text.trim()) return;
+
+            const tokens = text.split(/[\s,\n\t]+/);
+            let addedCount = 0;
+
+            tokens.forEach(t => {
+                const cleanToken = t.trim().replace(',', '.');
+                if (cleanToken !== '') {
+                    const num = parseFloat(cleanToken);
+                    if (!isNaN(num) && num >= 0) {
+                        readings.push(num);
+                        addedCount++;
+                    }
+                }
+            });
+
+            if (addedCount > 0) {
+                document.getElementById('batchInput').value = '';
+                switchInputTab('single');
+                updateUI();
+                showToast(`Se importaron ${addedCount} datos en lote.`);
+            } else {
+                showToast("No se encontraron números válidos.", true);
+            }
+        }
+
+        function deleteReading(index) {
+            readings.splice(index, 1);
+            updateUI();
+            showToast("Lectura eliminada.");
+        }
+
+        function loadDemoData() {
+            readings = [1411.2, 1413.8, 1410.5, 1412.0];
+            document.getElementById('unitSelect').value = "µS/cm";
+            updateUnits();
+            showToast("Datos de prueba cargados.");
+        }
+
+        function calculateStats() {
+            const n = readings.length;
+            if (n === 0) return null;
+
+            const sum = readings.reduce((acc, curr) => acc + curr, 0);
+            const mean = sum / n;
+
+            const min = Math.min(...readings);
+            const max = Math.max(...readings);
+            const range = max - min;
+
+            let sd = 0;
+            if (n > 1) {
+                const variance = readings.reduce((acc, curr) => acc + Math.pow(curr - mean, 2), 0) / (n - 1);
+                sd = Math.sqrt(variance);
+            }
+
+            const rsd = mean !== 0 ? (sd / mean) * 100 : 0;
+            const maxDev = mean !== 0 ? (range / mean) * 100 : 0;
+
+            return { n, mean, sd, min, max, range, rsd, maxDev };
+        }
+
+        function updateUI() {
+            const stats = calculateStats();
+            const count = readings.length;
+
+            document.getElementById('btnClear').disabled = count === 0;
+            document.getElementById('dataCounterText').textContent = `${count} ${count === 1 ? 'registro' : 'registros'}`;
+            document.getElementById('badgeCount').textContent = `${count} / 3 Registrados`;
+
+            renderTable(stats);
+
+            if (stats) {
+                document.getElementById('metricMean').textContent = stats.mean.toFixed(2);
+                document.getElementById('metricSD').textContent = stats.sd.toFixed(3);
+                document.getElementById('metricRSD').textContent = stats.rsd.toFixed(2) + '%';
+                document.getElementById('metricMaxDev').textContent = stats.maxDev.toFixed(2) + '%';
+            } else {
+                document.getElementById('metricMean').textContent = '-';
+                document.getElementById('metricSD').textContent = '-';
+                document.getElementById('metricRSD').textContent = '-';
+                document.getElementById('metricMaxDev').textContent = '-';
+            }
+
+            updateEvaluation(stats, count);
+            updateChart(stats);
+        }
+
+        function renderTable(stats) {
+            const tbody = document.getElementById('readingsTableBody');
+            tbody.innerHTML = '';
+
+            if (readings.length === 0) {
+                tbody.innerHTML = `
+                    <tr id="emptyTableMsg">
+                        <td colspan="4" class="px-4 py-8 text-center text-earth-500 italic">
+                            No hay mediciones registradas.<br>
+                            <span class="text-xs font-normal">Agregue al menos 3 valores para iniciar la evaluación.</span>
+                        </td>
+                    </tr>
+                `;
+                document.getElementById('minWarning').classList.remove('hidden');
+                return;
+            }
+
+            if (readings.length >= 3) {
+                document.getElementById('minWarning').classList.add('hidden');
+            } else {
+                document.getElementById('minWarning').classList.remove('hidden');
+            }
+
+            readings.forEach((val, idx) => {
+                const devFromMean = stats && stats.mean ? ((val - stats.mean) / stats.mean * 100).toFixed(2) : '0.00';
+                const devSign = devFromMean > 0 ? `+${devFromMean}` : devFromMean;
+
+                const tr = document.createElement('tr');
+                tr.className = "border-b border-earth-100 hover:bg-earth-50/80 transition-colors";
+                tr.innerHTML = `
+                    <td class="px-2.5 sm:px-4 py-2 sm:py-2.5 text-center font-medium text-earth-600">${idx + 1}</td>
+                    <td class="px-2.5 sm:px-4 py-2 sm:py-2.5 font-bold text-forest-900 text-xs sm:text-sm">${val.toFixed(2)} <span class="text-[10px] sm:text-xs font-normal text-earth-500">${currentUnit}</span></td>
+                    <td class="px-2.5 sm:px-4 py-2 sm:py-2.5 text-right font-mono text-xs ${Math.abs(devFromMean) > 3 ? 'text-red-600 font-bold' : 'text-earth-700'}">${devSign}%</td>
+                    <td class="px-2.5 sm:px-4 py-2 sm:py-2.5 text-center">
+                        <button onclick="deleteReading(${idx})" class="text-earth-400 hover:text-red-600 active:text-red-700 transition p-1.5 rounded-lg active:bg-earth-200" title="Eliminar este dato">
+                            <i class="fa-solid fa-trash-can text-sm"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateEvaluation(stats, count) {
+            const banner = document.getElementById('statusBanner');
+            const iconBg = document.getElementById('statusIconBg');
+            const icon = document.getElementById('statusIcon');
+            const title = document.getElementById('statusTitle');
+            const desc = document.getElementById('statusDesc');
+
+            const evalBadge = document.getElementById('evalBadge');
+            const rsdStatus = document.getElementById('rsdStatus');
+            const rsdBar = document.getElementById('rsdProgressBar');
+
+            if (count < 3) {
+                banner.className = "mb-4 sm:mb-6 bg-white rounded-2xl shadow-sm border border-earth-200 p-4 sm:p-5 transition-all duration-300";
+                iconBg.className = "w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-earth-100 text-earth-600 flex items-center justify-center text-lg sm:text-xl flex-shrink-0";
+                icon.className = "fa-solid fa-hourglass-start";
+                title.textContent = "Esperando más datos de medición";
+                title.className = "text-base sm:text-lg font-bold text-earth-900";
+                desc.textContent = `Se han ingresado ${count} de los 3 datos requeridos como mínimo para evaluar la repetibilidad (RSD ≤ 3.0%).`;
+
+                evalBadge.className = "w-full sm:w-auto text-center justify-center px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-earth-100 text-earth-700 flex items-center gap-2 flex-shrink-0";
+                evalBadge.innerHTML = `<i class="fa-solid fa-hourglass-half text-earth-600"></i> Faltan ${3 - count} dato(s)`;
+
+                rsdStatus.textContent = "Incompleto";
+                rsdStatus.className = "text-xs font-semibold text-earth-500";
+                rsdBar.style.width = "0%";
+                rsdBar.className = "bg-earth-400 h-3 rounded-full transition-all duration-500";
+
+                return;
+            }
+
+            const rsdPass = stats.rsd <= 3.0;
+            const rsdWidth = Math.min((stats.rsd / 3.0) * 100, 100);
+            rsdBar.style.width = `${rsdWidth}%`;
+
+            if (rsdPass) {
+                rsdStatus.textContent = `CUMPLE REPETIBILIDAD (${stats.rsd.toFixed(2)}%)`;
+                rsdStatus.className = "text-xs font-bold text-forest-600";
+                rsdBar.className = "bg-forest-500 h-3 rounded-full transition-all duration-500";
+
+                banner.className = "mb-4 sm:mb-6 bg-forest-50 rounded-2xl shadow-sm border border-forest-300 p-4 sm:p-5 transition-all duration-300";
+                iconBg.className = "w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-forest-600 text-white flex items-center justify-center text-lg sm:text-xl flex-shrink-0";
+                icon.className = "fa-solid fa-circle-check";
+                title.textContent = "¡CUMPLE EL CRITERIO DE REPETIBILIDAD! (RSD ≤ 3.0%)";
+                title.className = "text-base sm:text-lg font-bold text-forest-900";
+                desc.textContent = `La repetibilidad de los datos expresada como Desviación Estándar Relativa (RSD = ${stats.rsd.toFixed(2)}%) es satisfactoria y cumple con el criterio de aceptación del 3.0%.`;
+
+                evalBadge.className = "w-full sm:w-auto text-center justify-center px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-forest-600 text-white shadow flex items-center gap-2 flex-shrink-0";
+                evalBadge.innerHTML = `<i class="fa-solid fa-circle-check"></i> CUMPLE REPETIBILIDAD`;
+            } else {
+                rsdStatus.textContent = `EXCEDE TOLERANCIA (${stats.rsd.toFixed(2)}%)`;
+                rsdStatus.className = "text-xs font-bold text-red-600";
+                rsdBar.className = "bg-red-500 h-3 rounded-full transition-all duration-500";
+
+                banner.className = "mb-4 sm:mb-6 bg-red-50 rounded-2xl shadow-sm border border-red-300 p-4 sm:p-5 transition-all duration-300";
+                iconBg.className = "w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-red-600 text-white flex items-center justify-center text-lg sm:text-xl flex-shrink-0";
+                icon.className = "fa-solid fa-circle-xmark";
+                title.textContent = "NO CUMPLE EL CRITERIO DE REPETIBILIDAD (RSD > 3.0%)";
+                title.className = "text-base sm:text-lg font-bold text-red-950";
+                desc.textContent = `Atención: La variabilidad relativa de las lecturas (RSD = ${stats.rsd.toFixed(2)}%) excede el límite de repetibilidad permitido del 3.0%.`;
+
+                evalBadge.className = "w-full sm:w-auto text-center justify-center px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-red-600 text-white shadow flex items-center gap-2 flex-shrink-0";
+                evalBadge.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> NO CUMPLE`;
+            }
+        }
+
+        function initChart() {
+            const ctx = document.getElementById('conductivityChart').getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'Valor Medido',
+                            data: [],
+                            borderColor: '#2f6c5d',
+                            backgroundColor: 'rgba(47, 108, 93, 0.1)',
+                            borderWidth: 3,
+                            pointBackgroundColor: '#8b4f3b',
+                            pointRadius: 6,
+                            pointHoverRadius: 8,
+                            tension: 0.1,
+                            zIndex: 3
+                        },
+                        {
+                            label: 'Promedio',
+                            data: [],
+                            borderColor: '#8b4f3b',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            pointRadius: 0,
+                            fill: false,
+                            zIndex: 2
+                        },
+                        {
+                            label: '+3% Límite Superior',
+                            data: [],
+                            borderColor: 'rgba(220, 38, 38, 0.5)',
+                            borderWidth: 1.5,
+                            borderDash: [2, 2],
+                            pointRadius: 0,
+                            fill: false,
+                            zIndex: 1
+                        },
+                        {
+                            label: '-3% Límite Inferior',
+                            data: [],
+                            borderColor: 'rgba(220, 38, 38, 0.5)',
+                            borderWidth: 1.5,
+                            borderDash: [2, 2],
+                            pointRadius: 0,
+                            fill: false,
+                            zIndex: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.dataset.label}: ${context.parsed.y.toFixed(2)} ${currentUnit}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Muestra / N° Lectura',
+                                font: { size: 11, weight: '500' },
+                                color: '#734335'
+                            },
+                            grid: { color: 'rgba(238, 218, 207, 0.5)' }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: `Conductividad (${currentUnit})`,
+                                font: { size: 11, weight: '500' },
+                                color: '#734335'
+                            },
+                            grid: { color: 'rgba(238, 218, 207, 0.5)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateChart(stats) {
+            if (!chartInstance) return;
+
+            const labels = readings.map((_, i) => `Medición #${i + 1}`);
+            chartInstance.data.labels = labels;
+            chartInstance.data.datasets[0].data = readings;
+
+            if (stats && stats.mean) {
+                const meanVal = stats.mean;
+                const upper3 = meanVal * 1.03;
+                const lower3 = meanVal * 0.97;
+
+                chartInstance.data.datasets[1].data = Array(readings.length).fill(meanVal);
+                chartInstance.data.datasets[2].data = Array(readings.length).fill(upper3);
+                chartInstance.data.datasets[3].data = Array(readings.length).fill(lower3);
+            } else {
+                chartInstance.data.datasets[1].data = [];
+                chartInstance.data.datasets[2].data = [];
+                chartInstance.data.datasets[3].data = [];
+            }
+
+            chartInstance.options.scales.y.title.text = `Conductividad (${currentUnit})`;
+            chartInstance.update();
+        }
+
+        function exportCSV() {
+            if (readings.length === 0) {
+                showToast("No hay datos para exportar.", true);
+                return;
+            }
+
+            const stats = calculateStats();
+            let csvContent = "data:text/csv;charset=utf-8,";
+            
+            csvContent += "REPORTE DE REPETIBILIDAD DE CONDUCTIVIDAD\n";
+            csvContent += `Fecha,${new Date().toLocaleString()}\n`;
+            csvContent += `Unidad,${currentUnit}\n`;
+            csvContent += `Criterio Repetibilidad (RSD),≤ 3.0%\n\n`;
+
+            csvContent += "Lectura #,Valor Conductividad,Desviacion del Promedio (%)\n";
+            readings.forEach((v, idx) => {
+                const dev = stats ? ((v - stats.mean) / stats.mean * 100).toFixed(2) : '0';
+                csvContent += `${idx + 1},${v.toFixed(2)},${dev}%\n`;
+            });
+
+            if (stats && readings.length >= 3) {
+                csvContent += `\nESTADISTICAS\n`;
+                csvContent += `Promedio (Mean),${stats.mean.toFixed(2)} ${currentUnit}\n`;
+                csvContent += `Desviacion Estandar (SD),${stats.sd.toFixed(3)}\n`;
+                csvContent += `Desviacion Relativa / Repetibilidad (RSD %),${stats.rsd.toFixed(2)}%\n`;
+                csvContent += `Evaluacion Repetibilidad,${stats.rsd <= 3.0 ? 'CUMPLE' : 'NO CUMPLE'}\n`;
+            }
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `Reporte_Repetibilidad_Conductividad_${new Date().toISOString().slice(0,10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast("Reporte CSV descargado con éxito.");
+        }
+
+        function copySummaryToClipboard() {
+            if (readings.length === 0) {
+                showToast("No hay datos para copiar.", true);
+                return;
+            }
+
+            const stats = calculateStats();
+            const count = readings.length;
+
+            let report = `--- INFORME DE REPETIBILIDAD DE CONDUCTIVIDAD ---\n`;
+            report += `Fecha: ${new Date().toLocaleDateString()}\n`;
+            report += `Unidad: ${currentUnit}\n`;
+            report += `Muestras ingresadas (${count}): ${readings.join(', ')}\n`;
+
+            if (stats && count >= 3) {
+                report += `Promedio (x̄): ${stats.mean.toFixed(2)} ${currentUnit}\n`;
+                report += `Desv. Estándar (s): ${stats.sd.toFixed(3)}\n`;
+                report += `Repetibilidad (RSD %): ${stats.rsd.toFixed(2)}%\n`;
+                report += `Dictamen Repetibilidad (Criterio ≤ 3.0%): ${stats.rsd <= 3.0 ? 'CUMPLE / SATISFACTORIO' : 'NO CUMPLE / NO SATISFACTORIO'}\n`;
+            } else {
+                report += `Estado: Pendiente (se requieren al menos 3 datos).\n`;
+            }
+
+            const textContainer = document.createElement('textarea');
+            textContainer.value = report;
+            document.body.appendChild(textContainer);
+            textContainer.select();
+            document.execCommand('copy');
+            document.body.removeChild(textContainer);
+            showToast("¡Resumen copiado al portapapeles!");
+        }
+    </script>
+</body>
+</html>
